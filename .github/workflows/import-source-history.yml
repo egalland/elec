@@ -1,0 +1,40 @@
+name: Importer l'historique Git d'origine
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - source-history/elec.bundle
+      - .github/workflows/import-source-history.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: import-source-history
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Vérifier et importer les commits préservés
+        shell: bash
+        run: |
+          set -euo pipefail
+          git bundle verify source-history/elec.bundle
+          git fetch source-history/elec.bundle main:refs/remotes/source-history/main
+          test "$(git rev-parse refs/remotes/source-history/main)" = "b0bb5dce92bee058a640b4541055eba75554ce8e"
+          if git merge-base --is-ancestor refs/remotes/source-history/main HEAD; then
+            echo "Historique déjà présent."
+            exit 0
+          fi
+          git config user.name "Emmanuel Galland"
+          git config user.email "31864638+egalland@users.noreply.github.com"
+          git merge --no-ff --allow-unrelated-histories refs/remotes/source-history/main -m "Importer l’historique de travail complet avec ses auteurs et dates"
+          git push origin HEAD:main
